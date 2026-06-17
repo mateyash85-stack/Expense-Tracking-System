@@ -20,7 +20,7 @@ const expenseValidation = [
   body('title').notEmpty().withMessage('Title is required'),
   body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
   body('date').isISO8601().withMessage('Valid date is required'),
-  body('category').notEmpty().withMessage('Category is required'),
+  body('category_id').notEmpty().withMessage('Category is required'),
   body('type').optional().isIn(['income', 'expense']).withMessage('Type must be income or expense'),
 ];
 

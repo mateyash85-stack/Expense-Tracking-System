@@ -5,16 +5,18 @@ export const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    const { data, error } = await supabase.auth.signUp({
+    // Use admin client to create user — skips email confirmation in all environments
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: { data: { name } }, // stored in raw_user_meta_data → triggers profile creation
+      user_metadata: { name },
+      email_confirm: true, // auto-confirm so user can log in immediately
     });
 
     if (error) return res.status(400).json({ message: error.message });
 
     res.status(201).json({
-      message: 'Registration successful. Check your email to confirm your account.',
+      message: 'Registration successful.',
       user: { id: data.user?.id, email: data.user?.email, name },
     });
   } catch (error) {

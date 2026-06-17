@@ -1,10 +1,7 @@
 -- ============================================================
 -- Expense Tracking System — Supabase Schema
--- Run this in your Supabase project: SQL Editor → New Query
+-- Run this in: Supabase Dashboard → SQL Editor → New Query
 -- ============================================================
-
--- NOTE: auth.users is managed automatically by Supabase Auth.
--- We create a public profiles table that mirrors it.
 
 -- ----------------------------
 -- Profiles (extends auth.users)
@@ -15,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Auto-create profile on signup
+-- Auto-create profile row on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -33,7 +30,6 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-
 -- ----------------------------
 -- Categories
 -- ----------------------------
@@ -46,12 +42,18 @@ CREATE TABLE IF NOT EXISTS public.categories (
   UNIQUE (user_id, name)
 );
 
+-- ----------------------------
+-- Expense type enum (safe creation)
+-- ----------------------------
+DO $$ BEGIN
+  CREATE TYPE expense_type AS ENUM ('income', 'expense');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ----------------------------
 -- Expenses
 -- ----------------------------
-CREATE TYPE IF NOT EXISTS expense_type AS ENUM ('income', 'expense');
-
 CREATE TABLE IF NOT EXISTS public.expenses (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -65,7 +67,7 @@ CREATE TABLE IF NOT EXISTS public.expenses (
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Auto-update updated_at
+-- Auto-update updated_at on edit
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -79,7 +81,6 @@ CREATE TRIGGER expenses_updated_at
   BEFORE UPDATE ON public.expenses
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-
 -- ----------------------------
 -- Row Level Security (RLS)
 -- ----------------------------
@@ -87,14 +88,11 @@ ALTER TABLE public.profiles   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses   ENABLE ROW LEVEL SECURITY;
 
--- Profiles: users can only see/edit their own
-CREATE POLICY "profiles: own row" ON public.profiles
-  FOR ALL USING (auth.uid() = id);
+-- Drop policies if they exist, then recreate
+DROP POLICY IF EXISTS "profiles: own row"      ON public.profiles;
+DROP POLICY IF EXISTS "categories: own rows"   ON public.categories;
+DROP POLICY IF EXISTS "expenses: own rows"     ON public.expenses;
 
--- Categories: users can only access their own
-CREATE POLICY "categories: own rows" ON public.categories
-  FOR ALL USING (auth.uid() = user_id);
-
--- Expenses: users can only access their own
-CREATE POLICY "expenses: own rows" ON public.expenses
-  FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "profiles: own row"    ON public.profiles   FOR ALL USING (auth.uid() = id);
+CREATE POLICY "categories: own rows" ON public.categories FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "expenses: own rows"   ON public.expenses   FOR ALL USING (auth.uid() = user_id);

@@ -1,0 +1,315 @@
+{
+  "info": {
+    "name": "Expense Tracking System — FastAPI",
+    "description": "Complete API collection for the FastAPI backend running on port 8001.\n\nUsage:\n1. Run 'Register' or 'Login'\n2. Token is auto-saved to {{token}} variable\n3. All protected routes use {{token}} automatically",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8001/api" },
+    { "key": "token",    "value": "" },
+    { "key": "category_id", "value": "" },
+    { "key": "expense_id",  "value": "" }
+  ],
+  "item": [
+    {
+      "name": "🏥 Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "Check if the FastAPI server is running"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yash Mate\",\n  \"email\": \"yash@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "description": "Register a new user. Auto-confirms email — no verification needed."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('token', res.token);",
+                  "    console.log('✅ Token saved automatically');",
+                  "} else {",
+                  "    console.log('❌ No token in response:', JSON.stringify(res));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"yash@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "description": "Login and get JWT token. Token is auto-saved to {{token}} variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/me",
+            "description": "Get the currently logged-in user's profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"PASTE_REFRESH_TOKEN_HERE\"\n}"
+            },
+            "description": "Get a new access token using a refresh token"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/logout",
+            "description": "Invalidate the current session"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📂 Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/categories/",
+            "description": "Get all categories for the logged-in user"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.category && res.category.id) {",
+                  "    pm.collectionVariables.set('category_id', res.category.id);",
+                  "    console.log('✅ category_id saved:', res.category.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/categories/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Food\",\n  \"icon\": \"🍔\"\n}"
+            },
+            "description": "Create a new category. category_id is auto-saved to {{category_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/categories/{{category_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Food & Dining\",\n  \"icon\": \"🍽️\"\n}"
+            },
+            "description": "Update a category by ID. Uses {{category_id}} variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/categories/{{category_id}}",
+            "description": "Delete a category by ID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💸 Expenses",
+      "item": [
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/expenses/?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["expenses", ""],
+              "query": [
+                { "key": "page",        "value": "1" },
+                { "key": "limit",       "value": "20" },
+                { "key": "type",        "value": "expense",      "disabled": true },
+                { "key": "category_id", "value": "{{category_id}}", "disabled": true },
+                { "key": "start_date",  "value": "2026-01-01",   "disabled": true },
+                { "key": "end_date",    "value": "2026-12-31",   "disabled": true }
+              ]
+            },
+            "description": "List expenses with optional filters:\n- type: 'income' or 'expense'\n- category_id: UUID\n- start_date / end_date: YYYY-MM-DD\n- page / limit: pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/expenses/summary",
+              "host": ["{{base_url}}"],
+              "path": ["expenses", "summary"],
+              "query": [
+                { "key": "start_date", "value": "2026-01-01", "disabled": true },
+                { "key": "end_date",   "value": "2026-12-31", "disabled": true }
+              ]
+            },
+            "description": "Get total income, total expense, and balance"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Expense",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.expense && res.expense.id) {",
+                  "    pm.collectionVariables.set('expense_id', res.expense.id);",
+                  "    console.log('✅ expense_id saved:', res.expense.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/expenses/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Zomato Order\",\n  \"amount\": 450.00,\n  \"date\": \"2026-06-18\",\n  \"type\": \"expense\",\n  \"category_id\": \"{{category_id}}\",\n  \"note\": \"Dinner with friends\"\n}"
+            },
+            "description": "Create a new expense. Uses {{category_id}} — run Create Category first.\nexpense_id is auto-saved to {{expense_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Income",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/expenses/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Monthly Salary\",\n  \"amount\": 50000.00,\n  \"date\": \"2026-06-01\",\n  \"type\": \"income\",\n  \"category_id\": \"{{category_id}}\",\n  \"note\": \"June salary credit\"\n}"
+            },
+            "description": "Record an income entry"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Expense by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/expenses/{{expense_id}}",
+            "description": "Get a single expense by ID. Uses {{expense_id}} variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/expenses/{{expense_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Swiggy Order\",\n  \"amount\": 380.00,\n  \"note\": \"Updated — lunch\"\n}"
+            },
+            "description": "Update an expense. All fields are optional — only send what you want to change."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/expenses/{{expense_id}}",
+            "description": "Delete an expense by ID"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

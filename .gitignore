@@ -1,0 +1,22 @@
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Env files (never commit real keys)
+.env
+Backend/.env
+FastAPI_Backend/.env
+Frontend/.env
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

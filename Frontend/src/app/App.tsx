@@ -750,7 +750,7 @@ export default function App() {
         const newExp = await expensesApi.create({
           title:form.title, amount:parseFloat(form.amount),
           date:form.date, type:form.type, category_id:form.category_id,
-          note:form.note, user_id:user!.id,
+          note:form.note,
         });
         setExpenses(p=>[newExp,...p]);
         setSummary(prev=>{

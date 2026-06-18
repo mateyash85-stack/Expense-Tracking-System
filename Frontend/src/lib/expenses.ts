@@ -48,7 +48,10 @@ export const expensesApi = {
     return data.summary;
   },
 
-  create: async (payload: Omit<Expense, "id" | "category" | "created_at">) => {
+  create: async (payload: {
+    title: string; amount: number; date: string;
+    type: "income" | "expense"; category_id: string; note?: string;
+  }) => {
     const { data } = await api.post<{ expense: Expense }>("/expenses/", payload);
     return data.expense;
   },

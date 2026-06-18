@@ -9,23 +9,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS — allow local dev + deployed frontend
-allowed_origins = [
-    settings.CLIENT_ORIGIN,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "https://expense-tracking-system-1-72cz.onrender.com",
-]
-
-# In production allow all origins if CLIENT_ORIGIN is a wildcard
-if settings.CLIENT_ORIGIN == "*":
-    allowed_origins = ["*"]
-
+# CORS — allow all origins in production for simplicity
+# Restrict to specific origins by setting CLIENT_ORIGIN in Render env vars
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,   # must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )

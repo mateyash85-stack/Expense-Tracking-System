@@ -987,11 +987,18 @@ export default function App() {
               {/* Category */}
               <div>
                 <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1.5">Category</label>
-                <select value={form.category_id} onChange={e=>setForm(f=>({...f,category_id:e.target.value}))}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm text-foreground focus:outline-none transition-all"
-                  style={{background:"#090e17",border:"1px solid rgba(99,130,168,0.18)"}}>
-                  {categories.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-                </select>
+                {categories.length === 0 ? (
+                  <div className="w-full px-4 py-2.5 rounded-xl text-sm text-center"
+                    style={{background:"#090e17",border:"1px solid rgba(248,81,73,0.3)",color:"#f85149"}}>
+                    ⚠️ No categories found — they may still be loading. Close and reopen this modal.
+                  </div>
+                ) : (
+                  <select value={form.category_id} onChange={e=>setForm(f=>({...f,category_id:e.target.value}))}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm text-foreground focus:outline-none transition-all"
+                    style={{background:"#090e17",border:"1px solid rgba(99,130,168,0.18)"}}>
+                    {categories.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                  </select>
+                )}
               </div>
 
               {/* Date */}

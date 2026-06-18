@@ -18,15 +18,25 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export async function seedDefaultCategories(): Promise<Category[]> {
-  const existing = await categoriesApi.list();
-  if (existing.length > 0) return existing;
+  try {
+    const existing = await categoriesApi.list();
+    if (existing.length > 0) return existing;
 
-  const created: Category[] = [];
-  for (const cat of DEFAULT_CATEGORIES) {
-    try {
-      const c = await categoriesApi.create(cat.name, cat.icon);
-      created.push(c);
-    } catch (_) { /* skip duplicates */ }
+    // No categories yet — seed defaults in parallel for speed
+    const results = await Promise.allSettled(
+      DEFAULT_CATEGORIES.map(cat => categoriesApi.create(cat.name, cat.icon))
+    );
+
+    const created: Category[] = results
+      .filter((r): r is PromiseFulfilledResult<Category> => r.status === "fulfilled")
+      .map(r => r.value);
+
+    // Fetch again to get all (including any that already existed)
+    const final = await categoriesApi.list();
+    return final.length > 0 ? final : created;
+  } catch (err) {
+    console.error("Failed to seed categories:", err);
+    // Return empty array — modal will show the warning message
+    return [];
   }
-  return created;
 }

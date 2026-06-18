@@ -22,7 +22,7 @@ async def get_expenses(
     start_date:  str | None = Query(None),
     end_date:    str | None = Query(None),
     page:  int = Query(1,  ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=500),
     current_user=Depends(get_current_user),
 ):
     return await expense_controller.get_expenses(

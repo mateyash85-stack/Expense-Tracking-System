@@ -725,7 +725,7 @@ export default function App() {
       setLoadingData(true);
       try {
         const [expData,catData,sumData] = await Promise.all([
-          expensesApi.list({limit:200}), seedDefaultCategories(), expensesApi.summary(),
+          expensesApi.list({limit:100}), seedDefaultCategories(), expensesApi.summary(),
         ]);
         setExpenses(expData.expenses); setCategories(catData); setSummary(sumData);
         if(catData.length>0) setForm(f=>({...f,category_id:catData[0].id}));

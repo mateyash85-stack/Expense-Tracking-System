@@ -426,6 +426,8 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
   });
   const [editing, setEditing] = useState<string|null>(null);
   const [editVal, setEditVal] = useState("");
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [totalEditVal, setTotalEditVal] = useState("");
 
   const catTotals = useMemo(() => {
     const map: Record<string,number> = {};
@@ -449,17 +451,64 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
   const totalSpent  = Object.values(catTotals).reduce((a,b)=>a+b,0);
   const overCount   = allCats.filter(c => catTotals[c]>(limits[c]??DEFAULT_LIMITS[c]??Infinity)).length;
 
+  // Distribute new total budget proportionally across all categories
+  const applyTotalBudget = (newTotal: number) => {
+    if (newTotal <= 0 || allCats.length === 0) return;
+    const perCat = Math.round(newTotal / allCats.length);
+    const updated: Record<string,number> = {};
+    allCats.forEach(c => { updated[c] = perCat; });
+    saveLimits(updated);
+  };
+
   return (
     <div className="space-y-5">
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Budget" value={fmt(totalBudget)} sub="Monthly" accent="#58a6ff" />
+        {/* Total Budget — editable */}
+        <div className="hover-lift rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden"
+          style={{ background:"linear-gradient(160deg,#0f1620,#111927)", border:"1px solid rgba(88,166,255,0.3)", boxShadow:"0 2px 16px rgba(88,166,255,0.08)" }}>
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-[0.06] pointer-events-none"
+            style={{ background:"#58a6ff", transform:"translate(40%,-40%)" }} />
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total Budget</span>
+          {editingTotal ? (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-['DM_Mono',monospace] text-sm">₹</span>
+              <input type="number" value={totalEditVal} onChange={e=>setTotalEditVal(e.target.value)} autoFocus
+                className="flex-1 px-2 py-1 rounded-lg text-sm text-foreground focus:outline-none font-['DM_Mono',monospace]"
+                style={{ background:"#090e17", border:"1px solid rgba(88,166,255,0.5)" }}
+                onKeyDown={e=>{ if(e.key==="Enter"){applyTotalBudget(parseFloat(totalEditVal)||totalBudget);setEditingTotal(false);} if(e.key==="Escape")setEditingTotal(false); }}/>
+              <button onClick={()=>{applyTotalBudget(parseFloat(totalEditVal)||totalBudget);setEditingTotal(false);}}
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background:"rgba(88,166,255,0.15)", color:"#58a6ff" }}>
+                <Check className="w-3.5 h-3.5"/>
+              </button>
+              <button onClick={()=>setEditingTotal(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent/60">
+                <X className="w-3.5 h-3.5"/>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-['DM_Mono',monospace] text-2xl font-semibold text-foreground">{fmt(totalBudget)}</span>
+              <button onClick={()=>{setTotalEditVal(String(Math.round(totalBudget)));setEditingTotal(true);}}
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+                style={{ background:"rgba(88,166,255,0.1)", border:"1px solid rgba(88,166,255,0.25)", color:"#58a6ff" }}
+                title="Edit total budget — distributes evenly across all categories">
+                <Pencil className="w-3.5 h-3.5"/>
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Monthly · click ✏️ to edit</span>
+          </div>
+        </div>
+
         <StatCard label="Total Spent"  value={fmt(totalSpent)}  sub={`${((totalSpent/totalBudget)*100||0).toFixed(0)}% used`} trend="down" accent="#f85149" />
         <StatCard label="Remaining"    value={fmt(totalBudget-totalSpent)} sub="Left to spend" trend={totalBudget-totalSpent>=0?"up":"down"} accent="#3fb950" />
         <StatCard label="Over Limit"   value={`${overCount}`}  sub="categories over budget" alert={overCount>0} accent="#f85149" />
       </div>
 
-      <p className="text-xs text-muted-foreground">Click ✏️ on any card to set your monthly budget limit.</p>
+      <p className="text-xs text-muted-foreground">Click ✏️ on Total Budget to set an overall monthly limit (splits evenly). Click ✏️ on each card for per-category limits.</p>
 
       {/* Category budget cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

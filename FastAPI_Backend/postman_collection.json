@@ -5,7 +5,7 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://127.0.0.1:8001/api" },
+    { "key": "base_url", "value": "https://expense-tracking-system-1-72cz.onrender.com/api" },
     { "key": "token",    "value": "" },
     { "key": "category_id", "value": "" },
     { "key": "expense_id",  "value": "" }

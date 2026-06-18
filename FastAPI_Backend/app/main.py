@@ -15,6 +15,7 @@ allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
+    "https://expense-tracking-system-1-72cz.onrender.com",
 ]
 
 # In production allow all origins if CLIENT_ORIGIN is a wildcard

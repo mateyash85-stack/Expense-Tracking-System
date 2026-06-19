@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, Receipt, BarChart2, Plus, X, Wallet, Bell,
   ChevronRight, Search, Home, Car, Utensils, ShoppingBag, Coffee,
@@ -426,8 +426,6 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
   });
   const [editing, setEditing] = useState<string|null>(null);
   const [editVal, setEditVal] = useState("");
-  const [editingTotal, setEditingTotal] = useState(false);
-  const [totalEditVal, setTotalEditVal] = useState("");
 
   const catTotals = useMemo(() => {
     const map: Record<string,number> = {};
@@ -451,64 +449,17 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
   const totalSpent  = Object.values(catTotals).reduce((a,b)=>a+b,0);
   const overCount   = allCats.filter(c => catTotals[c]>(limits[c]??DEFAULT_LIMITS[c]??Infinity)).length;
 
-  // Distribute new total budget proportionally across all categories
-  const applyTotalBudget = (newTotal: number) => {
-    if (newTotal <= 0 || allCats.length === 0) return;
-    const perCat = Math.round(newTotal / allCats.length);
-    const updated: Record<string,number> = {};
-    allCats.forEach(c => { updated[c] = perCat; });
-    saveLimits(updated);
-  };
-
   return (
     <div className="space-y-5">
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Budget — editable */}
-        <div className="hover-lift rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden"
-          style={{ background:"linear-gradient(160deg,#0f1620,#111927)", border:"1px solid rgba(88,166,255,0.3)", boxShadow:"0 2px 16px rgba(88,166,255,0.08)" }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-[0.06] pointer-events-none"
-            style={{ background:"#58a6ff", transform:"translate(40%,-40%)" }} />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total Budget</span>
-          {editingTotal ? (
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-['DM_Mono',monospace] text-sm">₹</span>
-              <input type="number" value={totalEditVal} onChange={e=>setTotalEditVal(e.target.value)} autoFocus
-                className="flex-1 px-2 py-1 rounded-lg text-sm text-foreground focus:outline-none font-['DM_Mono',monospace]"
-                style={{ background:"#090e17", border:"1px solid rgba(88,166,255,0.5)" }}
-                onKeyDown={e=>{ if(e.key==="Enter"){applyTotalBudget(parseFloat(totalEditVal)||totalBudget);setEditingTotal(false);} if(e.key==="Escape")setEditingTotal(false); }}/>
-              <button onClick={()=>{applyTotalBudget(parseFloat(totalEditVal)||totalBudget);setEditingTotal(false);}}
-                className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background:"rgba(88,166,255,0.15)", color:"#58a6ff" }}>
-                <Check className="w-3.5 h-3.5"/>
-              </button>
-              <button onClick={()=>setEditingTotal(false)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent/60">
-                <X className="w-3.5 h-3.5"/>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-['DM_Mono',monospace] text-2xl font-semibold text-foreground">{fmt(totalBudget)}</span>
-              <button onClick={()=>{setTotalEditVal(String(Math.round(totalBudget)));setEditingTotal(true);}}
-                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-                style={{ background:"rgba(88,166,255,0.1)", border:"1px solid rgba(88,166,255,0.25)", color:"#58a6ff" }}
-                title="Edit total budget — distributes evenly across all categories">
-                <Pencil className="w-3.5 h-3.5"/>
-              </button>
-            </div>
-          )}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Monthly · click ✏️ to edit</span>
-          </div>
-        </div>
-
+        <StatCard label="Total Budget" value={fmt(totalBudget)} sub="Monthly" accent="#58a6ff" />
         <StatCard label="Total Spent"  value={fmt(totalSpent)}  sub={`${((totalSpent/totalBudget)*100||0).toFixed(0)}% used`} trend="down" accent="#f85149" />
         <StatCard label="Remaining"    value={fmt(totalBudget-totalSpent)} sub="Left to spend" trend={totalBudget-totalSpent>=0?"up":"down"} accent="#3fb950" />
         <StatCard label="Over Limit"   value={`${overCount}`}  sub="categories over budget" alert={overCount>0} accent="#f85149" />
       </div>
 
-      <p className="text-xs text-muted-foreground">Click ✏️ on Total Budget to set an overall monthly limit (splits evenly). Click ✏️ on each card for per-category limits.</p>
+      <p className="text-xs text-muted-foreground">Click ✏️ on any card to set your monthly budget limit.</p>
 
       {/* Category budget cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -564,14 +515,10 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
                 </div>
               ) : (
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Budget limit</span>
-                    <span className="text-xs font-['DM_Mono',monospace] font-semibold" style={{ color: meta.color }}>{fmtShort(limit)}</span>
-                  </div>
+                  <span className="text-xs text-muted-foreground font-['DM_Mono',monospace]">of {fmtShort(limit)}</span>
                   <button onClick={()=>{setEditing(name);setEditVal(String(limit));}}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                    style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.glow}` }}>
-                    <Pencil className="w-3 h-3"/> Set budget
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                    <Pencil className="w-3.5 h-3.5"/>
                   </button>
                 </div>
               )}
@@ -582,9 +529,7 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
               </div>
 
               <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
-                <div className="flex items-center gap-1.5">
-                  <span>{fmtShort(spent)} spent</span>
-                </div>
+                <span>{fmtShort(spent)} spent</span>
                 <span style={{ color: remaining<0?"#f85149":undefined }}>
                   {remaining>=0?`${fmtShort(remaining)} left`:`${fmtShort(Math.abs(remaining))} over`}
                 </span>
@@ -627,28 +572,13 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
       map[n]=(map[n]||0)+Number(t.amount);
     });
     return Object.entries(map).sort(([,a],[,b])=>b-a).map(([name,spent])=>({
-      name: name.length>8?name.slice(0,7)+"…":name, fullName: name, spent, color:getCat(name).color,
+      name: name.length>8?name.slice(0,7)+"…":name, spent, color:getCat(name).color,
     }));
   }, [expenses]);
 
   const biggestExp = useMemo(()=>expenses.filter(t=>t.type==="expense").sort((a,b)=>Number(b.amount)-Number(a.amount))[0],[expenses]);
   const totalIncome  = expenses.filter(t=>t.type==="income").reduce((a,t)=>a+Number(t.amount),0);
   const totalExpense = expenses.filter(t=>t.type==="expense").reduce((a,t)=>a+Number(t.amount),0);
-
-  // Smart axis formatter — shows actual value if < 1000, else shows k
-  const axisFormatter = (v: number) => {
-    if (v === 0) return "₹0";
-    if (v >= 100000) return `₹${(v/100000).toFixed(1)}L`;
-    if (v >= 1000)   return `₹${(v/1000).toFixed(0)}k`;
-    return `₹${v}`;
-  };
-
-  // Smart domain — adds 10% padding above max value so bars don't touch the top
-  const getMaxDomain = (data: any[], keys: string[]) => {
-    const max = Math.max(...data.flatMap(d => keys.map(k => Number(d[k]||0))));
-    if (max === 0) return 100;
-    return Math.ceil(max * 1.15);
-  };
 
   const CARD_STYLE = { background:"linear-gradient(160deg,#0f1620,#111927)", border:"1px solid rgba(99,130,168,0.12)", borderRadius:"1rem" };
 
@@ -670,7 +600,7 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
         <p className="text-xs text-muted-foreground mb-5">Cash flow by month</p>
         {monthlyData.length===0 ? <div className="py-10 text-center text-sm text-muted-foreground">No data yet</div> : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={monthlyData} margin={{top:10,right:10,left:10,bottom:0}}>
+            <AreaChart data={monthlyData} margin={{top:4,right:4,left:-10,bottom:0}}>
               <defs>
                 <linearGradient id="gInc" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#3fb950" stopOpacity={0.35}/>
@@ -683,13 +613,10 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,130,168,0.07)"/>
               <XAxis dataKey="month" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}/>
-              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
-                tickFormatter={axisFormatter}
-                domain={[0, getMaxDomain(monthlyData, ["income","expenses"])]}
-                width={60}/>
-              <Tooltip contentStyle={TT} formatter={(v:number, name:string)=>[fmt(v), name]}/>
-              <Area type="monotone" dataKey="income"   name="Income"   stroke="#3fb950" strokeWidth={2} fill="url(#gInc)" dot={{fill:"#3fb950",r:3}} activeDot={{r:5}}/>
-              <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#f85149" strokeWidth={2} fill="url(#gExp)" dot={{fill:"#f85149",r:3}} activeDot={{r:5}}/>
+              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
+              <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),""]}/>
+              <Area type="monotone" dataKey="income"   name="Income"   stroke="#3fb950" strokeWidth={2} fill="url(#gInc)" dot={false}/>
+              <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#f85149" strokeWidth={2} fill="url(#gExp)" dot={false}/>
               <Legend formatter={v=><span style={{fontSize:11,color:"#6e7a8a"}}>{v}</span>}/>
             </AreaChart>
           </ResponsiveContainer>
@@ -702,17 +629,19 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
           <h3 className="text-sm font-semibold mb-0.5">Daily Spending (Last 30 Days)</h3>
           <p className="text-xs text-muted-foreground mb-5">Day-by-day pattern</p>
           {dailyData.length===0 ? <div className="py-10 text-center text-sm text-muted-foreground">No data</div> : (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={dailyData} margin={{top:10,right:10,left:10,bottom:0}}>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={dailyData} margin={{top:4,right:4,left:-10,bottom:0}}>
+                <defs>
+                  <linearGradient id="gLine" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#58a6ff" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#58a6ff" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,130,168,0.07)"/>
                 <XAxis dataKey="date" tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
-                <YAxis tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
-                  tickFormatter={axisFormatter}
-                  domain={[0, getMaxDomain(dailyData, ["amt"])]}
-                  width={60}/>
+                <YAxis tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
                 <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),"Spent"]}/>
-                <Line type="monotone" dataKey="amt" stroke="#58a6ff" strokeWidth={2}
-                  dot={{fill:"#58a6ff",r:3}} activeDot={{r:6, fill:"#58a6ff", stroke:"#fff", strokeWidth:2}}/>
+                <Line type="monotone" dataKey="amt" stroke="#58a6ff" strokeWidth={2} dot={false}/>
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -721,17 +650,14 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
         {/* Category bar — horizontal */}
         <div className="p-5" style={CARD_STYLE}>
           <h3 className="text-sm font-semibold mb-0.5">Top Spending Categories</h3>
-          <p className="text-xs text-muted-foreground mb-5">Click a bar to see amount</p>
+          <p className="text-xs text-muted-foreground mb-5">Ranked highest to lowest</p>
           {catBar.length===0 ? <div className="py-10 text-center text-sm text-muted-foreground">No data</div> : (
-            <ResponsiveContainer width="100%" height={Math.max(180, catBar.length * 36)}>
-              <BarChart data={catBar} layout="vertical" margin={{top:4,right:60,left:4,bottom:0}}>
-                <XAxis type="number" tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
-                  tickFormatter={axisFormatter}
-                  domain={[0, getMaxDomain(catBar, ["spent"])]}/>
-                <YAxis type="category" dataKey="name" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} width={60}/>
-                <Tooltip contentStyle={TT}
-                  formatter={(v:number, _name:string, props:any)=>[fmt(v), props?.payload?.fullName ?? "Spent"]}/>
-                <Bar dataKey="spent" radius={[0,6,6,0]} label={{ position:"right", formatter:(v:number)=>fmt(v), fill:"#6e7a8a", fontSize:10 }}>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={catBar} layout="vertical" margin={{top:4,right:8,left:4,bottom:0}}>
+                <XAxis type="number" tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
+                <YAxis type="category" dataKey="name" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} width={56}/>
+                <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),"Spent"]}/>
+                <Bar dataKey="spent" radius={[0,4,4,0]}>
                   {catBar.map((e,i)=><Cell key={i} fill={e.color}/>)}
                 </Bar>
               </BarChart>
@@ -741,18 +667,17 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
       </div>
 
       {/* Monthly savings */}
-      {monthlyData.length>0 && (
+      {monthlyData.length>1 && (
         <div className="p-5" style={CARD_STYLE}>
           <h3 className="text-sm font-semibold mb-0.5">Monthly Savings</h3>
           <p className="text-xs text-muted-foreground mb-5">Green = saved money · Red = overspent</p>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={monthlyData} margin={{top:10,right:10,left:10,bottom:0}}>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={monthlyData} margin={{top:4,right:4,left:-10,bottom:0}}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,130,168,0.07)" vertical={false}/>
               <XAxis dataKey="month" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}/>
-              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
-                tickFormatter={axisFormatter} width={60}/>
+              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
               <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),"Savings"]}/>
-              <Bar dataKey="savings" radius={[4,4,0,0]} label={{ position:"top", formatter:(v:number)=>fmt(v), fill:"#6e7a8a", fontSize:10 }}>
+              <Bar dataKey="savings" radius={[4,4,0,0]}>
                 {monthlyData.map((e,i)=><Cell key={i} fill={e.savings>=0?"#3fb950":"#f85149"}/>)}
               </Bar>
             </BarChart>
@@ -865,80 +790,6 @@ export default function App() {
     setShowAdd(true);
   };
 
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(() => {
-    try { return new Set<string>(JSON.parse(localStorage.getItem("readNotifIds")||"[]")); }
-    catch { return new Set<string>(); }
-  });
-
-  // Show popup toasts for NEW warning alerts when data first loads
-  const popupShownRef = useRef(false);
-  useEffect(() => {
-    if (loadingData || popupShownRef.current || notifications.length === 0) return;
-    popupShownRef.current = true;
-    notifications
-      .filter(n => n.type === "warning" && !readIds.has(n.id))
-      .slice(0, 2) // max 2 popups
-      .forEach((n, i) => {
-        setTimeout(() => {
-          toast(n.title, {
-            description: n.message,
-            icon: "⚠️",
-            duration: 5000,
-          });
-        }, i * 1200);
-      });
-  }, [loadingData]);
-
-  // Generate smart notifications from real data
-  const notifications = useMemo(() => {
-    const alerts: { id: string; type: "warning"|"success"|"info"; title: string; message: string }[] = [];
-    const limits: Record<string,number> = (() => { try { return JSON.parse(localStorage.getItem("budgetLimits")||"{}"); } catch { return {}; } })();
-    const DEFAULT_LIMITS: Record<string,number> = { Food:5000,Transport:3000,Housing:15000,Shopping:4000,Coffee:1000,Utilities:2000,Health:2000,Entertainment:1500,Education:3000,Groceries:6000,Travel:8000,EMI:10000,Investment:5000 };
-
-    // Check each category vs budget
-    const catTotals: Record<string,number> = {};
-    expenses.filter(t=>t.type==="expense").forEach(t=>{
-      const n=t.category?.name??"Other";
-      catTotals[n]=(catTotals[n]||0)+Number(t.amount);
-    });
-    Object.entries(catTotals).forEach(([cat,spent])=>{
-      const limit = limits[cat]??DEFAULT_LIMITS[cat]??5000;
-      const pct = (spent/limit)*100;
-      if(pct>=100) alerts.push({ id:`over-${cat}`, type:"warning", title:`${cat} over budget`, message:`Spent ${fmt(spent)} — ${fmt(spent-limit)} over your ${fmt(limit)} limit` });
-      else if(pct>=80) alerts.push({ id:`near-${cat}`, type:"info", title:`${cat} almost full`, message:`${pct.toFixed(0)}% used — only ${fmt(limit-spent)} remaining` });
-    });
-
-    // Balance alert
-    if(summary.balance<0) alerts.push({ id:"neg-balance", type:"warning", title:"Negative balance", message:`You've spent ${fmt(Math.abs(summary.balance))} more than your income` });
-
-    // Savings good
-    const savingsRate = summary.income>0?(summary.balance/summary.income)*100:0;
-    if(savingsRate>30) alerts.push({ id:"good-savings", type:"success", title:"Great savings!", message:`You're saving ${savingsRate.toFixed(0)}% of your income this period` });
-
-    // Recent large expense
-    const recent = [...expenses].filter(t=>t.type==="expense").sort((a,b)=>Number(b.amount)-Number(a.amount))[0];
-    if(recent && Number(recent.amount)>2000) alerts.push({ id:"big-expense", type:"info", title:"Large transaction", message:`${recent.title} — ${fmt(Number(recent.amount))} on ${fmtDate(recent.date)}` });
-
-    // No expenses yet
-    if(expenses.length===0) alerts.push({ id:"no-data", type:"info", title:"Welcome to Fynance!", message:"Add your first transaction to start tracking expenses" });
-
-    return alerts;
-  }, [expenses, summary]);
-
-  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
-
-  const openNotifications = () => {
-    setShowNotifications(p => !p);
-    // Mark all as read when opening
-    if (!showNotifications) {
-      const allIds = notifications.map(n => n.id);
-      const newSet = new Set<string>(allIds);
-      setReadIds(newSet);
-      localStorage.setItem("readNotifIds", JSON.stringify(allIds));
-    }
-  };
-
   const NAV = [
     {id:"overview",    label:"Overview",     icon:LayoutDashboard},
     {id:"transactions",label:"Transactions", icon:Receipt},
@@ -1041,68 +892,12 @@ export default function App() {
               <TrendingDown className="w-3.5 h-3.5" style={{color:"#f85149"}}/>
               <span className="text-xs font-['DM_Mono',monospace] font-medium" style={{color:"#f85149"}}>{fmtShort(summary.expense)}</span>
             </div>
-            <div className="relative">
-              <button
-                onClick={openNotifications}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors relative"
-                style={{border:"1px solid rgba(99,130,168,0.14)"}}
-                onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}
-                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6e7a8a"}}>
-                <Bell className="w-4 h-4"/>
-                {unreadCount>0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
-                    style={{background:"#f85149",color:"#fff"}}>{unreadCount>9?"9+":unreadCount}</span>
-                )}
-              </button>
-
-              {/* Notification dropdown */}
-              {showNotifications && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={()=>setShowNotifications(false)}/>
-                  <div className="absolute right-0 top-11 w-80 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                    style={{background:"linear-gradient(160deg,#111927,#0d1420)",border:"1px solid rgba(99,130,168,0.2)"}}>
-                    <div className="flex items-center justify-between px-4 py-3" style={{borderBottom:"1px solid rgba(99,130,168,0.1)"}}>
-                      <div>
-                        <h3 className="text-sm font-semibold">Notifications</h3>
-                        <p className="text-[10px] text-muted-foreground">{unreadCount} alert{unreadCount!==1?"s":""}</p>
-                      </div>
-                      <button onClick={()=>setShowNotifications(false)} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-4 h-4"/>
-                      </button>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      {notifications.length===0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-30"/>
-                          All clear — no alerts
-                        </div>
-                      ) : notifications.map(n=>(
-                        <div key={n.id} className="flex gap-3 px-4 py-3 transition-colors"
-                          style={{borderBottom:"1px solid rgba(99,130,168,0.07)"}}
-                          onMouseEnter={e=>e.currentTarget.style.background="rgba(99,130,168,0.05)"}
-                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-sm"
-                            style={{background: n.type==="warning"?"rgba(248,81,73,0.15)":n.type==="success"?"rgba(63,185,80,0.15)":"rgba(88,166,255,0.15)"}}>
-                            {n.type==="warning"?"⚠️":n.type==="success"?"✅":"ℹ️"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold mb-0.5"
-                              style={{color: n.type==="warning"?"#f85149":n.type==="success"?"#3fb950":"#58a6ff"}}>
-                              {n.title}
-                            </div>
-                            <div className="text-xs text-muted-foreground leading-relaxed">{n.message}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="px-4 py-2.5 text-[10px] text-muted-foreground text-center"
-                      style={{borderTop:"1px solid rgba(99,130,168,0.07)"}}>
-                      Alerts based on your budget limits
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors"
+              style={{border:"1px solid rgba(99,130,168,0.14)"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}
+              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6e7a8a"}}>
+              <Bell className="w-4 h-4"/>
+            </button>
             <button onClick={()=>{setEditTx(null);setForm(blankForm());setShowAdd(true);}}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
               style={{background:"linear-gradient(135deg,#3fb950,#56d364)",color:"#060d0a",boxShadow:"0 4px 14px rgba(63,185,80,0.3)"}}>

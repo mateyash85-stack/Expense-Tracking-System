@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   LayoutDashboard, Receipt, BarChart2, Plus, X, Wallet, Bell,
   ChevronRight, Search, Home, Car, Utensils, ShoppingBag, Coffee,
@@ -860,6 +860,29 @@ export default function App() {
   };
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem("readNotifIds")||"[]")); }
+    catch { return new Set<string>(); }
+  });
+
+  // Show popup toasts for NEW warning alerts when data first loads
+  const popupShownRef = useRef(false);
+  useEffect(() => {
+    if (loadingData || popupShownRef.current || notifications.length === 0) return;
+    popupShownRef.current = true;
+    notifications
+      .filter(n => n.type === "warning" && !readIds.has(n.id))
+      .slice(0, 2) // max 2 popups
+      .forEach((n, i) => {
+        setTimeout(() => {
+          toast(n.title, {
+            description: n.message,
+            icon: "⚠️",
+            duration: 5000,
+          });
+        }, i * 1200);
+      });
+  }, [loadingData]);
 
   // Generate smart notifications from real data
   const notifications = useMemo(() => {
@@ -897,7 +920,18 @@ export default function App() {
     return alerts;
   }, [expenses, summary]);
 
-  const unreadCount = notifications.length;
+  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
+
+  const openNotifications = () => {
+    setShowNotifications(p => !p);
+    // Mark all as read when opening
+    if (!showNotifications) {
+      const allIds = notifications.map(n => n.id);
+      const newSet = new Set<string>(allIds);
+      setReadIds(newSet);
+      localStorage.setItem("readNotifIds", JSON.stringify(allIds));
+    }
+  };
 
   const NAV = [
     {id:"transactions",label:"Transactions", icon:Receipt},
@@ -1002,7 +1036,7 @@ export default function App() {
             </div>
             <div className="relative">
               <button
-                onClick={()=>setShowNotifications(p=>!p)}
+                onClick={openNotifications}
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors relative"
                 style={{border:"1px solid rgba(99,130,168,0.14)"}}
                 onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}

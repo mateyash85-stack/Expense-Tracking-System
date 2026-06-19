@@ -891,6 +891,24 @@ export default function App() {
     });
   }, [loadingData]);
 
+  // Popup for new alerts when expenses change (e.g. just went over budget)
+  const prevNotifIdsRef = useRef<Set<string>>(new Set());
+  useEffect(()=>{
+    if(loadingData) return;
+    const newAlerts = notifications.filter(n=>!prevNotifIdsRef.current.has(n.id)&&n.type==="warning");
+    newAlerts.forEach((n,i)=>{
+      setTimeout(()=>{ toast(n.title, {description:n.message, icon:"⚠️", duration:6000}); }, i*800);
+    });
+    prevNotifIdsRef.current = new Set(notifications.map(n=>n.id));
+  }, [notifications]);
+
+  const triggerAllPopups = () => {
+    notifications.forEach((n,i)=>{
+      const icon = n.type==="warning"?"⚠️":n.type==="success"?"✅":"ℹ️";
+      setTimeout(()=>{ toast(n.title, {description:n.message, icon, duration:5000}); }, i*700);
+    });
+  };
+
   const openNotifications = () => {
     setShowNotifications(p=>!p);
     if(!showNotifications) {
@@ -1043,9 +1061,16 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    <div className="px-4 py-2.5 text-[10px] text-muted-foreground text-center"
+                    <div className="px-4 py-3 flex items-center justify-between gap-2"
                       style={{borderTop:"1px solid rgba(99,130,168,0.07)"}}>
-                      Alerts based on your budget limits
+                      <span className="text-[10px] text-muted-foreground">Budget-based alerts</span>
+                      {notifications.length>0&&(
+                        <button onClick={()=>{triggerAllPopups();setShowNotifications(false);}}
+                          className="text-[10px] px-2.5 py-1 rounded-lg font-medium transition-colors"
+                          style={{background:"rgba(88,166,255,0.12)",color:"#58a6ff",border:"1px solid rgba(88,166,255,0.2)"}}>
+                          🔔 Pop all
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>

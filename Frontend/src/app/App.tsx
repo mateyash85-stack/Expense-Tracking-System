@@ -934,6 +934,7 @@ export default function App() {
   };
 
   const NAV = [
+    {id:"overview",    label:"Overview",     icon:LayoutDashboard},
     {id:"transactions",label:"Transactions", icon:Receipt},
     {id:"budgets",     label:"Budgets",      icon:Target},
     {id:"analytics",   label:"Analytics",    icon:BarChart2},

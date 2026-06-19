@@ -564,7 +564,7 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
                 </div>
               ) : (
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-muted-foreground font-['DM_Mono',monospace]">of {fmtShort(limit)}</span>
+                  <span className="text-xs text-muted-foreground font-['DM_Mono',monospace]">Set budget {fmtShort(limit)}</span>
                   <button onClick={()=>{setEditing(name);setEditVal(String(limit));}}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                     <Pencil className="w-3.5 h-3.5"/>

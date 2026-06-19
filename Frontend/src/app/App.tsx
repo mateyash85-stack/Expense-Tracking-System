@@ -621,13 +621,28 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
       map[n]=(map[n]||0)+Number(t.amount);
     });
     return Object.entries(map).sort(([,a],[,b])=>b-a).map(([name,spent])=>({
-      name: name.length>8?name.slice(0,7)+"…":name, spent, color:getCat(name).color,
+      name: name.length>8?name.slice(0,7)+"…":name, fullName: name, spent, color:getCat(name).color,
     }));
   }, [expenses]);
 
   const biggestExp = useMemo(()=>expenses.filter(t=>t.type==="expense").sort((a,b)=>Number(b.amount)-Number(a.amount))[0],[expenses]);
   const totalIncome  = expenses.filter(t=>t.type==="income").reduce((a,t)=>a+Number(t.amount),0);
   const totalExpense = expenses.filter(t=>t.type==="expense").reduce((a,t)=>a+Number(t.amount),0);
+
+  // Smart axis formatter — shows actual value if < 1000, else shows k
+  const axisFormatter = (v: number) => {
+    if (v === 0) return "₹0";
+    if (v >= 100000) return `₹${(v/100000).toFixed(1)}L`;
+    if (v >= 1000)   return `₹${(v/1000).toFixed(0)}k`;
+    return `₹${v}`;
+  };
+
+  // Smart domain — adds 10% padding above max value so bars don't touch the top
+  const getMaxDomain = (data: any[], keys: string[]) => {
+    const max = Math.max(...data.flatMap(d => keys.map(k => Number(d[k]||0))));
+    if (max === 0) return 100;
+    return Math.ceil(max * 1.15);
+  };
 
   const CARD_STYLE = { background:"linear-gradient(160deg,#0f1620,#111927)", border:"1px solid rgba(99,130,168,0.12)", borderRadius:"1rem" };
 
@@ -649,7 +664,7 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
         <p className="text-xs text-muted-foreground mb-5">Cash flow by month</p>
         {monthlyData.length===0 ? <div className="py-10 text-center text-sm text-muted-foreground">No data yet</div> : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={monthlyData} margin={{top:4,right:4,left:-10,bottom:0}}>
+            <AreaChart data={monthlyData} margin={{top:10,right:10,left:10,bottom:0}}>
               <defs>
                 <linearGradient id="gInc" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#3fb950" stopOpacity={0.35}/>
@@ -662,10 +677,13 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,130,168,0.07)"/>
               <XAxis dataKey="month" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}/>
-              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
-              <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),""]}/>
-              <Area type="monotone" dataKey="income"   name="Income"   stroke="#3fb950" strokeWidth={2} fill="url(#gInc)" dot={false}/>
-              <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#f85149" strokeWidth={2} fill="url(#gExp)" dot={false}/>
+              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
+                tickFormatter={axisFormatter}
+                domain={[0, getMaxDomain(monthlyData, ["income","expenses"])]}
+                width={60}/>
+              <Tooltip contentStyle={TT} formatter={(v:number, name:string)=>[fmt(v), name]}/>
+              <Area type="monotone" dataKey="income"   name="Income"   stroke="#3fb950" strokeWidth={2} fill="url(#gInc)" dot={{fill:"#3fb950",r:3}} activeDot={{r:5}}/>
+              <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#f85149" strokeWidth={2} fill="url(#gExp)" dot={{fill:"#f85149",r:3}} activeDot={{r:5}}/>
               <Legend formatter={v=><span style={{fontSize:11,color:"#6e7a8a"}}>{v}</span>}/>
             </AreaChart>
           </ResponsiveContainer>
@@ -678,19 +696,17 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
           <h3 className="text-sm font-semibold mb-0.5">Daily Spending (Last 30 Days)</h3>
           <p className="text-xs text-muted-foreground mb-5">Day-by-day pattern</p>
           {dailyData.length===0 ? <div className="py-10 text-center text-sm text-muted-foreground">No data</div> : (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={dailyData} margin={{top:4,right:4,left:-10,bottom:0}}>
-                <defs>
-                  <linearGradient id="gLine" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#58a6ff" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#58a6ff" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={dailyData} margin={{top:10,right:10,left:10,bottom:0}}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,130,168,0.07)"/>
                 <XAxis dataKey="date" tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
-                <YAxis tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
+                <YAxis tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
+                  tickFormatter={axisFormatter}
+                  domain={[0, getMaxDomain(dailyData, ["amt"])]}
+                  width={60}/>
                 <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),"Spent"]}/>
-                <Line type="monotone" dataKey="amt" stroke="#58a6ff" strokeWidth={2} dot={false}/>
+                <Line type="monotone" dataKey="amt" stroke="#58a6ff" strokeWidth={2}
+                  dot={{fill:"#58a6ff",r:3}} activeDot={{r:6, fill:"#58a6ff", stroke:"#fff", strokeWidth:2}}/>
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -699,14 +715,17 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
         {/* Category bar — horizontal */}
         <div className="p-5" style={CARD_STYLE}>
           <h3 className="text-sm font-semibold mb-0.5">Top Spending Categories</h3>
-          <p className="text-xs text-muted-foreground mb-5">Ranked highest to lowest</p>
+          <p className="text-xs text-muted-foreground mb-5">Click a bar to see amount</p>
           {catBar.length===0 ? <div className="py-10 text-center text-sm text-muted-foreground">No data</div> : (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={catBar} layout="vertical" margin={{top:4,right:8,left:4,bottom:0}}>
-                <XAxis type="number" tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
-                <YAxis type="category" dataKey="name" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} width={56}/>
-                <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),"Spent"]}/>
-                <Bar dataKey="spent" radius={[0,4,4,0]}>
+            <ResponsiveContainer width="100%" height={Math.max(180, catBar.length * 36)}>
+              <BarChart data={catBar} layout="vertical" margin={{top:4,right:60,left:4,bottom:0}}>
+                <XAxis type="number" tick={{fontSize:10,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
+                  tickFormatter={axisFormatter}
+                  domain={[0, getMaxDomain(catBar, ["spent"])]}/>
+                <YAxis type="category" dataKey="name" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} width={60}/>
+                <Tooltip contentStyle={TT}
+                  formatter={(v:number, _name:string, props:any)=>[fmt(v), props?.payload?.fullName ?? "Spent"]}/>
+                <Bar dataKey="spent" radius={[0,6,6,0]} label={{ position:"right", formatter:(v:number)=>fmt(v), fill:"#6e7a8a", fontSize:10 }}>
                   {catBar.map((e,i)=><Cell key={i} fill={e.color}/>)}
                 </Bar>
               </BarChart>
@@ -716,17 +735,18 @@ function AnalyticsTab({ expenses }: { expenses: Expense[] }) {
       </div>
 
       {/* Monthly savings */}
-      {monthlyData.length>1 && (
+      {monthlyData.length>0 && (
         <div className="p-5" style={CARD_STYLE}>
           <h3 className="text-sm font-semibold mb-0.5">Monthly Savings</h3>
           <p className="text-xs text-muted-foreground mb-5">Green = saved money · Red = overspent</p>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={monthlyData} margin={{top:4,right:4,left:-10,bottom:0}}>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={monthlyData} margin={{top:10,right:10,left:10,bottom:0}}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,130,168,0.07)" vertical={false}/>
               <XAxis dataKey="month" tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}/>
-              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`}/>
+              <YAxis tick={{fontSize:11,fill:"#6e7a8a"}} axisLine={false} tickLine={false}
+                tickFormatter={axisFormatter} width={60}/>
               <Tooltip contentStyle={TT} formatter={(v:number)=>[fmt(v),"Savings"]}/>
-              <Bar dataKey="savings" radius={[4,4,0,0]}>
+              <Bar dataKey="savings" radius={[4,4,0,0]} label={{ position:"top", formatter:(v:number)=>fmt(v), fill:"#6e7a8a", fontSize:10 }}>
                 {monthlyData.map((e,i)=><Cell key={i} fill={e.savings>=0?"#3fb950":"#f85149"}/>)}
               </Bar>
             </BarChart>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   LayoutDashboard, Receipt, BarChart2, Plus, X, Wallet, Bell,
   ChevronRight, Search, Home, Car, Utensils, ShoppingBag, Coffee,
@@ -424,8 +424,10 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
   const [limits, setLimits] = useState<Record<string,number>>(() => {
     try { return JSON.parse(localStorage.getItem("budgetLimits")||"{}"); } catch { return {}; }
   });
-  const [editing, setEditing] = useState<string|null>(null);
-  const [editVal, setEditVal] = useState("");
+  const [editing, setEditing]         = useState<string|null>(null);
+  const [editVal, setEditVal]         = useState("");
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [totalEditVal, setTotalEditVal] = useState("");
 
   const catTotals = useMemo(() => {
     const map: Record<string,number> = {};
@@ -445,6 +447,14 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
     setLimits(u); localStorage.setItem("budgetLimits",JSON.stringify(u));
   };
 
+  const applyTotalBudget = (newTotal: number) => {
+    if (newTotal <= 0 || allCats.length === 0) return;
+    const perCat = Math.round(newTotal / allCats.length);
+    const updated: Record<string,number> = {};
+    allCats.forEach(c => { updated[c] = perCat; });
+    saveLimits(updated);
+  };
+
   const totalBudget = allCats.reduce((a,c) => a+(limits[c]??DEFAULT_LIMITS[c]??0),0);
   const totalSpent  = Object.values(catTotals).reduce((a,b)=>a+b,0);
   const overCount   = allCats.filter(c => catTotals[c]>(limits[c]??DEFAULT_LIMITS[c]??Infinity)).length;
@@ -453,13 +463,52 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
     <div className="space-y-5">
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Budget" value={fmt(totalBudget)} sub="Monthly" accent="#58a6ff" />
+        {/* Total Budget — editable */}
+        <div className="hover-lift rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden"
+          style={{ background:"linear-gradient(160deg,#0f1620,#111927)", border:"1px solid rgba(88,166,255,0.35)", boxShadow:"0 2px 16px rgba(88,166,255,0.08)" }}>
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-[0.06] pointer-events-none"
+            style={{ background:"#58a6ff", transform:"translate(40%,-40%)" }} />
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total Budget</span>
+          {editingTotal ? (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-['DM_Mono',monospace] text-sm">₹</span>
+              <input type="number" value={totalEditVal} onChange={e=>setTotalEditVal(e.target.value)} autoFocus
+                className="flex-1 px-2 py-1.5 rounded-lg text-sm text-foreground focus:outline-none font-['DM_Mono',monospace]"
+                style={{ background:"#090e17", border:"1px solid rgba(88,166,255,0.5)" }}
+                onKeyDown={e=>{
+                  if(e.key==="Enter"){applyTotalBudget(parseFloat(totalEditVal)||totalBudget);setEditingTotal(false);}
+                  if(e.key==="Escape") setEditingTotal(false);
+                }}/>
+              <button onClick={()=>{applyTotalBudget(parseFloat(totalEditVal)||totalBudget);setEditingTotal(false);}}
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background:"rgba(88,166,255,0.15)", color:"#58a6ff" }}>
+                <Check className="w-3.5 h-3.5"/>
+              </button>
+              <button onClick={()=>setEditingTotal(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent/60">
+                <X className="w-3.5 h-3.5"/>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-['DM_Mono',monospace] text-2xl font-semibold text-foreground">{fmt(totalBudget)}</span>
+              <button onClick={()=>{setTotalEditVal(String(Math.round(totalBudget)));setEditingTotal(true);}}
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all"
+                style={{ background:"rgba(88,166,255,0.12)", border:"1px solid rgba(88,166,255,0.3)", color:"#58a6ff" }}
+                title="Edit total budget — distributes evenly across all categories">
+                <Pencil className="w-3.5 h-3.5"/>
+              </button>
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground">Monthly · ✏️ splits evenly</div>
+        </div>
+
         <StatCard label="Total Spent"  value={fmt(totalSpent)}  sub={`${((totalSpent/totalBudget)*100||0).toFixed(0)}% used`} trend="down" accent="#f85149" />
         <StatCard label="Remaining"    value={fmt(totalBudget-totalSpent)} sub="Left to spend" trend={totalBudget-totalSpent>=0?"up":"down"} accent="#3fb950" />
         <StatCard label="Over Limit"   value={`${overCount}`}  sub="categories over budget" alert={overCount>0} accent="#f85149" />
       </div>
 
-      <p className="text-xs text-muted-foreground">Click ✏️ on any card to set your monthly budget limit.</p>
+      <p className="text-xs text-muted-foreground">Click ✏️ on Total Budget to set an overall limit (splits evenly). Click ✏️ on each card for per-category limits.</p>
 
       {/* Category budget cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -797,6 +846,60 @@ export default function App() {
     {id:"analytics",   label:"Analytics",    icon:BarChart2},
   ] as const;
 
+  // ── Notifications ──────────────────────────────────────────────────────────
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem("readNotifIds")||"[]")); }
+    catch { return new Set<string>(); }
+  });
+  const popupShownRef = useRef(false);
+
+  const notifications = useMemo(() => {
+    const alerts: {id:string; type:"warning"|"success"|"info"; title:string; message:string}[] = [];
+    const storedLimits: Record<string,number> = (() => {
+      try { return JSON.parse(localStorage.getItem("budgetLimits")||"{}"); } catch { return {}; }
+    })();
+    const DLIMITS: Record<string,number> = {Food:5000,Transport:3000,Housing:15000,Shopping:4000,Coffee:1000,Utilities:2000,Health:2000,Entertainment:1500,Education:3000,Groceries:6000,Travel:8000,EMI:10000,Investment:5000};
+    const catTotals: Record<string,number> = {};
+    expenses.filter(t=>t.type==="expense").forEach(t=>{
+      const n=t.category?.name??"Other";
+      catTotals[n]=(catTotals[n]||0)+Number(t.amount);
+    });
+    Object.entries(catTotals).forEach(([cat,spent])=>{
+      const lim = storedLimits[cat]??DLIMITS[cat]??5000;
+      const pct = (spent/lim)*100;
+      if(pct>=100) alerts.push({id:`over-${cat}`,type:"warning",title:`${cat} over budget`,message:`Spent ${fmt(spent)} — ${fmt(spent-lim)} over your ${fmt(lim)} limit`});
+      else if(pct>=80) alerts.push({id:`near-${cat}`,type:"info",title:`${cat} almost full`,message:`${pct.toFixed(0)}% used — only ${fmt(lim-spent)} remaining`});
+    });
+    if(summary.balance<0) alerts.push({id:"neg-bal",type:"warning",title:"Negative balance",message:`You've spent ${fmt(Math.abs(summary.balance))} more than your income`});
+    const savingsRate = summary.income>0?(summary.balance/summary.income)*100:0;
+    if(savingsRate>30) alerts.push({id:"good-save",type:"success",title:"Great savings!",message:`You're saving ${savingsRate.toFixed(0)}% of your income`});
+    const bigExp = [...expenses].filter(t=>t.type==="expense").sort((a,b)=>Number(b.amount)-Number(a.amount))[0];
+    if(bigExp && Number(bigExp.amount)>2000) alerts.push({id:"big-exp",type:"info",title:"Large transaction",message:`${bigExp.title} — ${fmt(Number(bigExp.amount))} on ${fmtDate(bigExp.date)}`});
+    if(expenses.length===0) alerts.push({id:"welcome",type:"info",title:"Welcome to Fynance!",message:"Add your first transaction to start tracking"});
+    return alerts;
+  }, [expenses, summary]);
+
+  const unreadCount = notifications.filter(n=>!readIds.has(n.id)).length;
+
+  // Show popup toasts once when data loads
+  useEffect(()=>{
+    if(loadingData || popupShownRef.current || notifications.length===0) return;
+    popupShownRef.current = true;
+    notifications.filter(n=>n.type==="warning"&&!readIds.has(n.id)).slice(0,2).forEach((n,i)=>{
+      setTimeout(()=>{ toast(n.title, {description:n.message, icon:"⚠️", duration:5000}); }, i*1200);
+    });
+  }, [loadingData]);
+
+  const openNotifications = () => {
+    setShowNotifications(p=>!p);
+    if(!showNotifications) {
+      const allIds = notifications.map(n=>n.id);
+      setReadIds(new Set<string>(allIds));
+      localStorage.setItem("readNotifIds", JSON.stringify(allIds));
+    }
+  };
+
   const spentPct = summary.income>0 ? Math.min((summary.expense/summary.income)*100,100):0;
 
   return (
@@ -892,12 +995,62 @@ export default function App() {
               <TrendingDown className="w-3.5 h-3.5" style={{color:"#f85149"}}/>
               <span className="text-xs font-['DM_Mono',monospace] font-medium" style={{color:"#f85149"}}>{fmtShort(summary.expense)}</span>
             </div>
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors"
-              style={{border:"1px solid rgba(99,130,168,0.14)"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}
-              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6e7a8a"}}>
-              <Bell className="w-4 h-4"/>
-            </button>
+            <div className="relative">
+              <button onClick={openNotifications}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors relative"
+                style={{border:"1px solid rgba(99,130,168,0.14)"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}
+                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6e7a8a"}}>
+                <Bell className="w-4 h-4"/>
+                {unreadCount>0&&(
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+                    style={{background:"#f85149",color:"#fff"}}>{unreadCount>9?"9+":unreadCount}</span>
+                )}
+              </button>
+              {showNotifications&&(
+                <>
+                  <div className="fixed inset-0 z-40" onClick={()=>setShowNotifications(false)}/>
+                  <div className="absolute right-0 top-11 w-80 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    style={{background:"linear-gradient(160deg,#111927,#0d1420)",border:"1px solid rgba(99,130,168,0.2)"}}>
+                    <div className="flex items-center justify-between px-4 py-3" style={{borderBottom:"1px solid rgba(99,130,168,0.1)"}}>
+                      <div>
+                        <h3 className="text-sm font-semibold">Notifications</h3>
+                        <p className="text-[10px] text-muted-foreground">{notifications.length} alert{notifications.length!==1?"s":""}</p>
+                      </div>
+                      <button onClick={()=>setShowNotifications(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4"/></button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length===0?(
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-30"/>All clear — no alerts
+                        </div>
+                      ):notifications.map(n=>(
+                        <div key={n.id} className="flex gap-3 px-4 py-3 transition-colors"
+                          style={{borderBottom:"1px solid rgba(99,130,168,0.07)"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="rgba(99,130,168,0.05)"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-sm"
+                            style={{background:n.type==="warning"?"rgba(248,81,73,0.15)":n.type==="success"?"rgba(63,185,80,0.15)":"rgba(88,166,255,0.15)"}}>
+                            {n.type==="warning"?"⚠️":n.type==="success"?"✅":"ℹ️"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold mb-0.5"
+                              style={{color:n.type==="warning"?"#f85149":n.type==="success"?"#3fb950":"#58a6ff"}}>
+                              {n.title}
+                            </div>
+                            <div className="text-xs text-muted-foreground leading-relaxed">{n.message}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-4 py-2.5 text-[10px] text-muted-foreground text-center"
+                      style={{borderTop:"1px solid rgba(99,130,168,0.07)"}}>
+                      Alerts based on your budget limits
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <button onClick={()=>{setEditTx(null);setForm(blankForm());setShowAdd(true);}}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
               style={{background:"linear-gradient(135deg,#3fb950,#56d364)",color:"#060d0a",boxShadow:"0 4px 14px rgba(63,185,80,0.3)"}}>

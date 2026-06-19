@@ -891,7 +891,7 @@ export default function App() {
     warnings.slice(0,3).forEach((n,i)=>{
       setTimeout(()=>{
         toast.warning(n.title, {description:n.message, duration:6000});
-      }, i*1000);
+      }, 2000 + i*1000);  // 2s initial delay, then 1s between each
     });
   }, [loadingData, notifications]);
 

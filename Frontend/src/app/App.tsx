@@ -564,10 +564,14 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
                 </div>
               ) : (
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-muted-foreground font-['DM_Mono',monospace]">of {fmtShort(limit)}</span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Budget limit</span>
+                    <span className="text-xs font-['DM_Mono',monospace] font-semibold" style={{ color: meta.color }}>{fmtShort(limit)}</span>
+                  </div>
                   <button onClick={()=>{setEditing(name);setEditVal(String(limit));}}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
-                    <Pencil className="w-3.5 h-3.5"/>
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.glow}` }}>
+                    <Pencil className="w-3 h-3"/> Set budget
                   </button>
                 </div>
               )}
@@ -578,7 +582,9 @@ function BudgetsTab({ expenses }: { expenses: Expense[] }) {
               </div>
 
               <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
-                <span>{fmtShort(spent)} spent</span>
+                <div className="flex items-center gap-1.5">
+                  <span>{fmtShort(spent)} spent</span>
+                </div>
                 <span style={{ color: remaining<0?"#f85149":undefined }}>
                   {remaining>=0?`${fmtShort(remaining)} left`:`${fmtShort(Math.abs(remaining))} over`}
                 </span>

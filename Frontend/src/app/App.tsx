@@ -859,8 +859,47 @@ export default function App() {
     setShowAdd(true);
   };
 
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Generate smart notifications from real data
+  const notifications = useMemo(() => {
+    const alerts: { id: string; type: "warning"|"success"|"info"; title: string; message: string }[] = [];
+    const limits: Record<string,number> = (() => { try { return JSON.parse(localStorage.getItem("budgetLimits")||"{}"); } catch { return {}; } })();
+    const DEFAULT_LIMITS: Record<string,number> = { Food:5000,Transport:3000,Housing:15000,Shopping:4000,Coffee:1000,Utilities:2000,Health:2000,Entertainment:1500,Education:3000,Groceries:6000,Travel:8000,EMI:10000,Investment:5000 };
+
+    // Check each category vs budget
+    const catTotals: Record<string,number> = {};
+    expenses.filter(t=>t.type==="expense").forEach(t=>{
+      const n=t.category?.name??"Other";
+      catTotals[n]=(catTotals[n]||0)+Number(t.amount);
+    });
+    Object.entries(catTotals).forEach(([cat,spent])=>{
+      const limit = limits[cat]??DEFAULT_LIMITS[cat]??5000;
+      const pct = (spent/limit)*100;
+      if(pct>=100) alerts.push({ id:`over-${cat}`, type:"warning", title:`${cat} over budget`, message:`Spent ${fmt(spent)} — ${fmt(spent-limit)} over your ${fmt(limit)} limit` });
+      else if(pct>=80) alerts.push({ id:`near-${cat}`, type:"info", title:`${cat} almost full`, message:`${pct.toFixed(0)}% used — only ${fmt(limit-spent)} remaining` });
+    });
+
+    // Balance alert
+    if(summary.balance<0) alerts.push({ id:"neg-balance", type:"warning", title:"Negative balance", message:`You've spent ${fmt(Math.abs(summary.balance))} more than your income` });
+
+    // Savings good
+    const savingsRate = summary.income>0?(summary.balance/summary.income)*100:0;
+    if(savingsRate>30) alerts.push({ id:"good-savings", type:"success", title:"Great savings!", message:`You're saving ${savingsRate.toFixed(0)}% of your income this period` });
+
+    // Recent large expense
+    const recent = [...expenses].filter(t=>t.type==="expense").sort((a,b)=>Number(b.amount)-Number(a.amount))[0];
+    if(recent && Number(recent.amount)>2000) alerts.push({ id:"big-expense", type:"info", title:"Large transaction", message:`${recent.title} — ${fmt(Number(recent.amount))} on ${fmtDate(recent.date)}` });
+
+    // No expenses yet
+    if(expenses.length===0) alerts.push({ id:"no-data", type:"info", title:"Welcome to Fynance!", message:"Add your first transaction to start tracking expenses" });
+
+    return alerts;
+  }, [expenses, summary]);
+
+  const unreadCount = notifications.length;
+
   const NAV = [
-    {id:"overview",    label:"Overview",     icon:LayoutDashboard},
     {id:"transactions",label:"Transactions", icon:Receipt},
     {id:"budgets",     label:"Budgets",      icon:Target},
     {id:"analytics",   label:"Analytics",    icon:BarChart2},
@@ -961,12 +1000,68 @@ export default function App() {
               <TrendingDown className="w-3.5 h-3.5" style={{color:"#f85149"}}/>
               <span className="text-xs font-['DM_Mono',monospace] font-medium" style={{color:"#f85149"}}>{fmtShort(summary.expense)}</span>
             </div>
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors"
-              style={{border:"1px solid rgba(99,130,168,0.14)"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}
-              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6e7a8a"}}>
-              <Bell className="w-4 h-4"/>
-            </button>
+            <div className="relative">
+              <button
+                onClick={()=>setShowNotifications(p=>!p)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground transition-colors relative"
+                style={{border:"1px solid rgba(99,130,168,0.14)"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(99,130,168,0.08)";e.currentTarget.style.color="#e6edf3"}}
+                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6e7a8a"}}>
+                <Bell className="w-4 h-4"/>
+                {unreadCount>0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+                    style={{background:"#f85149",color:"#fff"}}>{unreadCount>9?"9+":unreadCount}</span>
+                )}
+              </button>
+
+              {/* Notification dropdown */}
+              {showNotifications && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={()=>setShowNotifications(false)}/>
+                  <div className="absolute right-0 top-11 w-80 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    style={{background:"linear-gradient(160deg,#111927,#0d1420)",border:"1px solid rgba(99,130,168,0.2)"}}>
+                    <div className="flex items-center justify-between px-4 py-3" style={{borderBottom:"1px solid rgba(99,130,168,0.1)"}}>
+                      <div>
+                        <h3 className="text-sm font-semibold">Notifications</h3>
+                        <p className="text-[10px] text-muted-foreground">{unreadCount} alert{unreadCount!==1?"s":""}</p>
+                      </div>
+                      <button onClick={()=>setShowNotifications(false)} className="text-muted-foreground hover:text-foreground">
+                        <X className="w-4 h-4"/>
+                      </button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length===0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                          All clear — no alerts
+                        </div>
+                      ) : notifications.map(n=>(
+                        <div key={n.id} className="flex gap-3 px-4 py-3 transition-colors"
+                          style={{borderBottom:"1px solid rgba(99,130,168,0.07)"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="rgba(99,130,168,0.05)"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-sm"
+                            style={{background: n.type==="warning"?"rgba(248,81,73,0.15)":n.type==="success"?"rgba(63,185,80,0.15)":"rgba(88,166,255,0.15)"}}>
+                            {n.type==="warning"?"⚠️":n.type==="success"?"✅":"ℹ️"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold mb-0.5"
+                              style={{color: n.type==="warning"?"#f85149":n.type==="success"?"#3fb950":"#58a6ff"}}>
+                              {n.title}
+                            </div>
+                            <div className="text-xs text-muted-foreground leading-relaxed">{n.message}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-4 py-2.5 text-[10px] text-muted-foreground text-center"
+                      style={{borderTop:"1px solid rgba(99,130,168,0.07)"}}>
+                      Alerts based on your budget limits
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <button onClick={()=>{setEditTx(null);setForm(blankForm());setShowAdd(true);}}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
               style={{background:"linear-gradient(135deg,#3fb950,#56d364)",color:"#060d0a",boxShadow:"0 4px 14px rgba(63,185,80,0.3)"}}>

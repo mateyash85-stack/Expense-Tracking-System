@@ -884,28 +884,43 @@ export default function App() {
 
   // Show popup toasts once when data loads
   useEffect(()=>{
-    if(loadingData || popupShownRef.current || notifications.length===0) return;
+    if(loadingData || notifications.length===0) return;
+    if(popupShownRef.current) return;
     popupShownRef.current = true;
-    notifications.filter(n=>n.type==="warning"&&!readIds.has(n.id)).slice(0,2).forEach((n,i)=>{
-      setTimeout(()=>{ toast(n.title, {description:n.message, icon:"⚠️", duration:5000}); }, i*1200);
+    const warnings = notifications.filter(n=>n.type==="warning");
+    warnings.slice(0,3).forEach((n,i)=>{
+      setTimeout(()=>{
+        toast.warning(n.title, {description:n.message, duration:6000});
+      }, i*1000);
     });
-  }, [loadingData]);
+  }, [loadingData, notifications]);
 
   // Popup for new alerts when expenses change (e.g. just went over budget)
   const prevNotifIdsRef = useRef<Set<string>>(new Set());
   useEffect(()=>{
-    if(loadingData) return;
-    const newAlerts = notifications.filter(n=>!prevNotifIdsRef.current.has(n.id)&&n.type==="warning");
+    if(loadingData || !popupShownRef.current) return;
+    const newAlerts = notifications.filter(n=>
+      !prevNotifIdsRef.current.has(n.id) && n.type==="warning"
+    );
     newAlerts.forEach((n,i)=>{
-      setTimeout(()=>{ toast(n.title, {description:n.message, icon:"⚠️", duration:6000}); }, i*800);
+      setTimeout(()=>{
+        toast.warning(n.title, {description:n.message, duration:6000});
+      }, i*800);
     });
     prevNotifIdsRef.current = new Set(notifications.map(n=>n.id));
   }, [notifications]);
 
   const triggerAllPopups = () => {
+    if(notifications.length===0){
+      toast.info("No alerts right now", {description:"Everything looks good!", duration:3000});
+      return;
+    }
     notifications.forEach((n,i)=>{
-      const icon = n.type==="warning"?"⚠️":n.type==="success"?"✅":"ℹ️";
-      setTimeout(()=>{ toast(n.title, {description:n.message, icon, duration:5000}); }, i*700);
+      setTimeout(()=>{
+        if(n.type==="warning") toast.warning(n.title, {description:n.message, duration:5000});
+        else if(n.type==="success") toast.success(n.title, {description:n.message, duration:5000});
+        else toast.info(n.title, {description:n.message, duration:5000});
+      }, i*700);
     });
   };
 
